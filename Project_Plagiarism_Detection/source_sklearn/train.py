@@ -5,9 +5,10 @@ import os
 import pandas as pd
 
 from sklearn.externals import joblib
-
-## TODO: Import any additional libraries you need to define a model
-
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import StratifiedShuffleSplit,StratifiedKFold
+from sklearn.ensemble import RandomForestClassifier
 
 # Provided model load function
 def model_fn(model_dir):
@@ -37,34 +38,39 @@ if __name__ == '__main__':
     parser.add_argument('--output-data-dir', type=str, default=os.environ['SM_OUTPUT_DATA_DIR'])
     parser.add_argument('--model-dir', type=str, default=os.environ['SM_MODEL_DIR'])
     parser.add_argument('--data-dir', type=str, default=os.environ['SM_CHANNEL_TRAIN'])
-    
-    ## TODO: Add any additional arguments that you will need to pass into your model
-    
+
+    parser.add_argument('--n-estimators', type=int, default=10)
+    parser.add_argument('--min-samples-leaf', type=int, default=1)
+    parser.add_argument('--min-samples-split', type=int, default=2)
+    parser.add_argument('--max-depth', type=int, default=None)
+    parser.add_argument('--max-leaf-nodes', type=int, default=-1)
+
     # args holds all passed-in arguments
     args = parser.parse_args()
+    print('here!!!')
+    print(args.max_leaf_nodes)
+    print('here!!!')
 
     # Read in csv training file
     training_dir = args.data_dir
     train_data = pd.read_csv(os.path.join(training_dir, "train.csv"), header=None, names=None)
 
+    stratified_k_fold = StratifiedKFold(n_splits=5, shuffle=True, random_state=10)
+
+
     # Labels are in the first column
     train_y = train_data.iloc[:,0]
     train_x = train_data.iloc[:,1:]
-    
-    
-    ## --- Your code here --- ##
-    
 
-    ## TODO: Define a model 
-    model = None
+    ## TODO: Define a model
+    model = RandomForestClassifier(n_estimators=args.n_estimators,
+        min_samples_leaf=args.min_samples_leaf,
+                                   min_samples_split=args.min_samples_split,max_depth=args.max_depth,
+                                   max_leaf_nodes=args.max_leaf_nodes, n_jobs=-1)
+    cv_results = cross_validate(RandomForestClassifier(), train_x, train_y, cv=stratified_k_fold,
+                                scoring=('recall', 'f1', 'roc_auc'), return_train_score=True)
+    print(cv_results)
     
-    
-    ## TODO: Train the model
-    
-    
-    
-    ## --- End of your code  --- ##
-    
-
+    model.fit(train_x, train_y)
     # Save the trained model
     joblib.dump(model, os.path.join(args.model_dir, "model.joblib"))
